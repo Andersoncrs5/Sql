@@ -81,6 +81,19 @@ services:
     volumes:
       - ./plugins:/etc/kafka-connect/jars
 
+  processor:
+    build: ./api
+    container_name: cdc-processor
+    depends_on:
+      - kafka
+      - mongo
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_TOPIC: "pgserver1.cdc_schema.clients" 
+      MONGO_URI: "mongodb://root:rootpassword@mongo:27017"
+      MONGO_DATABASE: "cdc_db"
+      MONGO_COLLECTION: "clients"
+
 volumes:
   mongo-data: {}
   postgres-data: {}
