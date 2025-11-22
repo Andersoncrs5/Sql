@@ -1,0 +1,30 @@
+docker exec -it mongo mongosh -u root -p rootpassword
+
+curl -X DELETE http://localhost:8083/connectors/mongo-sink
+
+
+curl -X POST http://localhost:8083/connectors \
+  -H "Content-Type: application/json" \
+  -d '{
+     "name": "mongo-sink",
+        "config": {
+            "connector.class": "com.mongodb.kafka.connect.MongoSinkConnector",
+            "connection.uri": "mongodb://root:rootpassword@mongo:27017/?authSource=admin",
+            "topics": "pgserver1.cdc_schema.clients",
+            "database": "cdc_db",
+            "collection": "clients",
+            "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+            "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+            "value.converter.schemas.enable": "false",
+            "transforms": "unwrap",
+            "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+            "transforms.unwrap.drop.tombstones": "true",
+            "transforms.unwrap.delete.handling.mode": "rewrite",
+            "writemodel.strategy": "com.mongodb.kafka.connect.sink.writemodel.strategy.ReplaceOneBusinessKeyStrategy",
+            "document.id.strategy": "com.mongodb.kafka.connect.sink.processor.id.strategy.PartialValueStrategy",
+            "document.id.strategy.overwrite.existing": "true",
+            "document.id.strategy.partial.value.projection.type": "whitelist",
+            "document.id.strategy.partial.value.projection.list": "id"
+        }
+  }'
+

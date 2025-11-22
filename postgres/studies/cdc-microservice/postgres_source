@@ -1,0 +1,25 @@
+curl -X POST http://localhost:8083/connectors \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "postgres-cdc",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+
+      "database.hostname": "postgres",
+      "database.port": "5432",
+      "database.user": "debezium",
+      "database.password": "12345678",
+      "database.dbname": "postgres",
+
+      "plugin.name": "pgoutput",
+      "slot.name": "debezium_slot",
+
+      "schema.include.list": "cdc_schema",
+      "table.include.list": "cdc_schema.clients",
+
+      "topic.prefix": "pgserver1",
+
+      "tombstones.on.delete": "false",
+      "include.schema.changes": "false"
+    }
+  }'

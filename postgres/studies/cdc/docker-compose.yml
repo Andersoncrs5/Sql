@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # 1. MongoDB (Destino)
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+    volumes:
+      - mongo-data:/data/db
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: cdc_database
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    command: -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10
+
+  # 3. Apache Kafka (Modo KRaft - Sem Zookeeper)
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_KRAFT_MODE: "true"  # This enables KRaft mode in Kafka.
+      KAFKA_PROCESS_ROLES: controller,broker  # Kafka acts as both broker and controller.
+      KAFKA_NODE_ID: 1  # A unique ID for this Kafka instance.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"  # Defines the controller voters.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LOG_DIRS: /var/lib/kafka/data  # Where Kafka stores its logs.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"  # Kafka will automatically create topics if needed.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1  # Since we’re running one broker, one replica is enough.
+      KAFKA_LOG_RETENTION_HOURS: 168  # Keep logs for 7 days.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0  # No delay for consumer rebalancing.
+      CLUSTER_ID: "Mk3OEYBSD34fcwNTJENDM2Qk"  # A unique ID for the Kafka cluster.
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  # 4. Kafka Connect (CDC Engine)
+  connect:
+    image: confluentinc/cp-kafka-connect:7.4.0 
+    container_name: kafka-connect
+    ports:
+      - "8083:8083" # API REST para configurar os conectores
+    depends_on:
+      - kafka # Depende apenas do Kafka
+      - postgres
+      - mongo
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "kafka:9092"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/doc,/etc/kafka-connect/jars"
+      CONNECT_GROUP_ID: cg-1
+      CONNECT_CONFIG_STORAGE_TOPIC: kafka_connect_config
+      CONNECT_OFFSET_STORAGE_TOPIC: kafka_connect_offset
+      CONNECT_STATUS_STORAGE_TOPIC: kafka_connect_status
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+
+    volumes:
+      - ./plugins:/etc/kafka-connect/jars
+
+volumes:
+  mongo-data: {}
+  postgres-data: {}
+  kafka-data: {}
